@@ -1,0 +1,7 @@
+63f7b34db8d8cdea90c76aacccf841ec
+::res://::1763585250
+ERADME.md::TextFile::-1::1763585920::0::1::::<><><>0<>0<><>::
+icon.png::CompressedTexture2D::3642775039388084844::1763581730::1763581883::1::::<><><>0<>0<>e2d4f55c8006318547fb89874c251863<>res://.godot/imported/icon.png-487276ed1e3a0c39cad0279d744ee560.ctex::
+main.tscn::PackedScene::8832633975569767740::1763585250::0::1::::<><><>0<>0<><>::uid://t1f4fyrhr1j5::::res://scripts/game.gd
+::res://scripts/::1763585398
+game.gd::GDScript::1387617524189755600::1763585398::0::1::::<>Node2D<><>0<>0<><>::

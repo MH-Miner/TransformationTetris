@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3 uid="uid://dx3ugq6scgb0w"]
+
+[ext_resource type="Script" uid="uid://t1f4fyrhr1j5" path="res://scripts/game.gd" id="1"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1")
+
+[node name="PieceTimer" type="Timer" parent="."]
+wait_time = 10.0
+one_shot = true
