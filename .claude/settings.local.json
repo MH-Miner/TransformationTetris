@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 5 node:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

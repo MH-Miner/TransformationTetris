@@ -78,17 +78,39 @@ var mode_checkbox : CheckBox				  # toggles timed/untimed mode
 var _button_y : float = 100.0				 # helper for stacking buttons vertically
 var panel_size : int = 10
 
+# New UI elements for custom translation input
+var translate_x_input : LineEdit			  # input field for X translation
+var translate_y_input : LineEdit			  # input field for Y translation
+var save_button : Button					  # manual save button
+
 var piece_timer : Timer					   # timer used for timed mode
+
+var http_request : HTTPRequest				# for sending data to server
+
+# Server configuration
+var server_url : String = "http://localhost:3000/save_game"  # Change this to your server URL
+var session_id : String = ""				  # unique ID for this game session
+var game_start_time : float = 0.0			 # timestamp when game started
+var pieces_dropped : int = 0				  # total pieces dropped this session
+var total_transforms : int = 0				# total transformations across all pieces
 
 func _ready() -> void:
 	randomize()
 	_init_board()
+	# Generate a unique session ID
+	session_id = _generate_session_id()
+	game_start_time = Time.get_unix_time_from_system()
 	# Grab reference to the Timer node defined in the scene.  The timer is
 	# configured as one‑shot and will not start on its own.
 	piece_timer = $PieceTimer
 	piece_timer.one_shot = true
 	piece_timer.autostart = false
 	piece_timer.connect("timeout", Callable(self, "_on_piece_timer_timeout"))
+
+	# Create HTTPRequest node for server communication
+	http_request = HTTPRequest.new()
+	add_child(http_request)
+	http_request.connect("request_completed", Callable(self, "_on_http_request_completed"))
 	# Set up the user interface (score, mode toggle and transformation buttons)
 	_create_ui()
 	# Spawn the first piece into the empty board
@@ -99,7 +121,13 @@ func _resize_panel():
 	print(ui_vbox.size)
 	ui_panel.size = ui_vbox.size + Vector2(20, 20)
 	print(ui_panel.size)
-	
+
+func _generate_session_id() -> String:
+	# Generate a unique session ID using timestamp and random number
+	var timestamp = Time.get_unix_time_from_system()
+	var random_part = randi() % 10000
+	return "session_%d_%d" % [timestamp, random_part]
+
 func _init_board() -> void:
 	# Initialize the board as an array of height rows, each containing
 	# BOARD_WIDTH entries.  A null entry signifies an empty cell.
@@ -142,6 +170,46 @@ func _create_ui() -> void:
 	ui_vbox.add_child(mode_checkbox)
 	panel_size += 30
 
+	# Add separator label
+	var sep_label = Label.new()
+	sep_label.text = "--- Custom Translation ---"
+	ui_vbox.add_child(sep_label)
+	panel_size += 30
+
+	# Create input fields for custom translation
+	var x_container = HBoxContainer.new()
+	var x_label = Label.new()
+	x_label.text = "X: "
+	x_container.add_child(x_label)
+
+	translate_x_input = LineEdit.new()
+	translate_x_input.placeholder_text = "0"
+	translate_x_input.custom_minimum_size = Vector2(60, 0)
+	x_container.add_child(translate_x_input)
+	ui_vbox.add_child(x_container)
+	panel_size += 30
+
+	var y_container = HBoxContainer.new()
+	var y_label = Label.new()
+	y_label.text = "Y: "
+	y_container.add_child(y_label)
+
+	translate_y_input = LineEdit.new()
+	translate_y_input.placeholder_text = "0"
+	translate_y_input.custom_minimum_size = Vector2(60, 0)
+	y_container.add_child(translate_y_input)
+	ui_vbox.add_child(y_container)
+	panel_size += 30
+
+	# Add custom translate button
+	_add_button("Translate T(x,y)", "_on_custom_translate")
+
+	# Add separator label
+	var sep_label2 = Label.new()
+	sep_label2.text = "--- Quick Actions ---"
+	ui_vbox.add_child(sep_label2)
+	panel_size += 30
+
 	# Reset the button y offset for subsequent buttons
 	_button_y = 100.0
 	# Helper to add a button with the given label and callback name
@@ -154,6 +222,20 @@ func _create_ui() -> void:
 	_add_button("Reflect H", "_on_reflect_horizontal")
 	_add_button("Reflect V", "_on_reflect_vertical")
 	_add_button("Drop", "_on_drop")
+
+	# Add separator label
+	var sep_label3 = Label.new()
+	sep_label3.text = "--- Data Management ---"
+	ui_vbox.add_child(sep_label3)
+	panel_size += 30
+
+	# Add save button
+	save_button = Button.new()
+	save_button.text = "Save to Server"
+	save_button.size = Vector2(120, 32)
+	save_button.connect("pressed", Callable(self, "_on_save_to_server"))
+	ui_vbox.add_child(save_button)
+	panel_size += 30
 
 func _add_button(label_text: String, callback_name: String) -> void:
 	var btn := Button.new()
@@ -211,7 +293,9 @@ func _apply_translation(dx: int, dy: int) -> void:
 	if _valid_position(current_cells, new_offset):
 		current_offset = new_offset
 		transform_count += 1
+		total_transforms += 1
 		_update_ghost()
+		_autosave_game_data()
 
 func _apply_rotation() -> void:
 	# Rotates the current piece 90 degrees clockwise around its pivot.  The
@@ -224,7 +308,9 @@ func _apply_rotation() -> void:
 	if _valid_position(rotated, current_offset):
 		current_cells = rotated
 		transform_count += 1
+		total_transforms += 1
 		_update_ghost()
+		_autosave_game_data()
 
 func _apply_reflection(vertical: bool) -> void:
 	# Reflects the current piece across its own local axis.  When vertical
@@ -241,7 +327,9 @@ func _apply_reflection(vertical: bool) -> void:
 	if _valid_position(reflected, current_offset):
 		current_cells = reflected
 		transform_count += 1
+		total_transforms += 1
 		_update_ghost()
+		_autosave_game_data()
 
 func _update_ghost() -> void:
 	# Computes the ghost preview positions by simulating a drop from the
@@ -307,6 +395,8 @@ func _drop_piece() -> void:
 		score -= transform_count
 		if score < 0:
 			score = 0
+
+	pieces_dropped += 1
 	_update_score_label()
 	# Spawn next piece
 	_spawn_piece()
@@ -341,9 +431,35 @@ func _on_mode_toggled(pressed: bool) -> void:
 		timer_label.visible = false
 		piece_timer.stop()
 	_resize_panel()
-	
 
-	
+func _on_custom_translate() -> void:
+	# Read values from input fields and apply translation
+	var x_text = translate_x_input.text.strip_edges()
+	var y_text = translate_y_input.text.strip_edges()
+
+	# Treat empty fields as 0
+	if x_text.is_empty():
+		x_text = "0"
+	if y_text.is_empty():
+		y_text = "0"
+
+	# Validate inputs
+	if not x_text.is_valid_int():
+		print("Invalid X value: must be an integer")
+		return
+	if not y_text.is_valid_int():
+		print("Invalid Y value: must be an integer")
+		return
+
+	var dx = x_text.to_int()
+	var dy = y_text.to_int()
+
+	_apply_translation(dx, dy)
+
+	# Clear input fields after successful translation
+	translate_x_input.text = ""
+	translate_y_input.text = ""
+
 func _on_move_left() -> void:
 	_apply_translation(-1, 0)
 
@@ -364,6 +480,82 @@ func _on_reflect_vertical() -> void:
 
 func _on_drop() -> void:
 	_drop_piece()
+
+func _on_save_to_server() -> void:
+	# Prepare game data and send to server
+	var game_data = _prepare_game_data()
+	_send_to_server(game_data)
+
+func _prepare_game_data() -> Dictionary:
+	# Prepare game statistics as a dictionary
+	var current_time = Time.get_unix_time_from_system()
+	var play_duration = current_time - game_start_time
+
+	return {
+		"session_id": session_id,
+		"timestamp": Time.get_datetime_string_from_system(),
+		"score": score,
+		"pieces_dropped": pieces_dropped,
+		"total_transforms": total_transforms,
+		"mode": "timed" if timed_mode else "untimed",
+		"play_duration_seconds": play_duration,
+		"avg_transforms_per_piece": float(total_transforms) / max(pieces_dropped, 1)
+	}
+
+func _dict_to_csv(data: Dictionary) -> String:
+	# Convert dictionary to CSV format
+	# First line: headers, second line: values
+	var headers = []
+	var values = []
+
+	for key in data.keys():
+		headers.append(key)
+		values.append(str(data[key]))
+
+	var csv = ",".join(headers) + "\n"
+	csv += ",".join(values) + "\n"
+
+	return csv
+
+func _autosave_game_data() -> void:
+	# Automatically save game data after each transformation
+	var game_data = _prepare_game_data()
+	_send_to_server(game_data)
+
+func _send_to_server(data: Dictionary) -> void:
+	# Convert dictionary to CSV format
+	var csv_data = _dict_to_csv(data)
+
+	# Prepare HTTP headers
+	var headers = [
+		"Content-Type: text/csv",
+		"Accept: application/json"
+	]
+
+	# Send POST request
+	var error = http_request.request(
+		server_url,
+		headers,
+		HTTPClient.METHOD_POST,
+		csv_data
+	)
+
+	if error != OK:
+		print("Error sending data to server: ", error)
+	else:
+		print("Data sent to server successfully")
+		save_button.disabled = true  # Prevent duplicate saves
+
+func _on_http_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	# Handle server response
+	if response_code == 200 or response_code == 201:
+		print("Server saved data successfully!")
+		save_button.text = "Saved ✓"
+	else:
+		print("Server error: ", response_code)
+		var response_body = body.get_string_from_utf8()
+		print("Response: ", response_body)
+		save_button.disabled = false  # Re-enable on error
 
 func _draw() -> void:
 	# Draw the grid, placed blocks, the ghost preview and the current piece.

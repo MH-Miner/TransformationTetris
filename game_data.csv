@@ -1,0 +1,2 @@
+session_id,timestamp,score,pieces_dropped,total_transforms,mode,play_duration_seconds,avg_transforms_per_piece
+session_player1_1234,2025-11-20T00:12:00Z,1000,10,25,timed,60.5,2.5

@@ -1,3 +1,9 @@
 res://scripts/game.gd
-res://main.tscn
-res://README.md
+res://TASK_LIST.md
+res://game_data.timestamp.translation
+res://game_data.score.translation
+res://game_data.pieces.translation
+res://game_data.total.translation
+res://game_data.mode.translation
+res://game_data.play.translation
+res://game_data.avg.translation

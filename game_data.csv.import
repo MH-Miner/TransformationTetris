@@ -1,0 +1,17 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dry4apwm8e5bm"
+
+[deps]
+
+files=["res://game_data.timestamp.translation", "res://game_data.score.translation", "res://game_data.pieces.translation", "res://game_data.total.translation", "res://game_data.mode.translation", "res://game_data.play.translation", "res://game_data.avg.translation"]
+
+source_file="res://game_data.csv"
+dest_files=["res://game_data.timestamp.translation", "res://game_data.score.translation", "res://game_data.pieces.translation", "res://game_data.total.translation", "res://game_data.mode.translation", "res://game_data.play.translation", "res://game_data.avg.translation"]
+
+[params]
+
+compress=true
+delimiter=0
